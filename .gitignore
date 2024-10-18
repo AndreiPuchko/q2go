@@ -1,0 +1,8 @@
+.vscode
+.cache
+build/*
+deps
+quazip/*
+release/*
+!/release/._deploy.bat
+CMakeLists.txt.user
