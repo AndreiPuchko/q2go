@@ -20,7 +20,7 @@ QToolButton#toolButton_Ok {background: green}</string>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <item>
-     <widget class="QFrame" name="frame">
+     <widget class="QFrame" name="frame_toolbar">
       <property name="frameShape">
        <enum>QFrame::Shape::StyledPanel</enum>
       </property>

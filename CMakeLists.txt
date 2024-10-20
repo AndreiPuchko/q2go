@@ -23,6 +23,7 @@ set(CMAKE_AUTORCC ON)
 find_package(Qt6 REQUIRED COMPONENTS Core)
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 find_package(Qt6 REQUIRED COMPONENTS Network)
+find_package(Qt6 REQUIRED COMPONENTS Concurrent)
 
 # add_subdirectory(./deps/fmt)
 
@@ -84,4 +85,5 @@ target_include_directories(q2go PRIVATE ${RC_DIR})
 target_link_libraries(q2go Qt6::Core)
 target_link_libraries(q2go Qt6::Widgets)
 target_link_libraries(q2go Qt6::Network)
+target_link_libraries(q2go Qt6::Concurrent)
 target_link_libraries(q2go QuaZip::QuaZip)

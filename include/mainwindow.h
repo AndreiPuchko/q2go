@@ -18,7 +18,8 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = nullptr);
     std::string color_task = "<font color=cyan>";
-    std::string color_cmd = "<font color=red>";
+    std::string color_cmd = "<font color=pink>";
+    std::string color_err = "<font color=red font size=+3>";
     std::string color_out = "<font color=green>";
     std::string font_size2 = "<font size=+2>";
     ~MainWindow();
@@ -29,15 +30,21 @@ private slots:
     void mylog(std::string s);
     void mylog(std::string s, std::string format);
     bool is_python();
+    void process_finished(int exitCode, QProcess::ExitStatus ExitStatus);
 
 private:
     QProcess *process;
     QStringList process_output_list;
     Ui::MainWindow *ui;
+    bool busy;
     bool run_q2rad();
-    int install_local_python();
+    
+    bool install_local_python();
+    bool install_pip();
+    bool install_local_q2rad();
+
     int install_on_system_python();
-    void download_python_zip();
+    bool download_python_zip();
 
     void process_output();
     QString process_start(QString program, QStringList arguments, bool async);

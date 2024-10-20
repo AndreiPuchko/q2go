@@ -16,6 +16,10 @@
 #include <QThread>
 #include <quazip/quazipfile.h>
 #include <quazip/quazip.h>
+#include <future>
+#include <thread>
+#include <chrono>
+
 // #include "fmt/core.h"
 
 using namespace std;
@@ -28,8 +32,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
                                           ui(new Ui::MainWindow)
 {
     process = new QProcess(this);
+    busy = false;
     connect(process, &QProcess::readyReadStandardOutput, this, &MainWindow::process_output);
-    // connect(process, &QProcess::started, this, &MainWindow::process_start);
+    connect(process, &QProcess::finished, this, &MainWindow::process_finished);
 
     // install_local_python();
     // exit(0);
@@ -88,39 +93,76 @@ void MainWindow::process_output()
 QString MainWindow::process_start(QString program, QStringList arguments, bool async = true)
 {
     process_output_list.clear();
+    process->kill();
     process->start(program, arguments);
-    this->setDisabled(true);
     QString command = program;
     command.append(" ");
     command.append(arguments.join((" ")));
-    process_output_list.append(program);
+    // process_output_list.append(program);
     mylog(command.toStdString(), color_cmd);
     QApplication::processEvents();
-    process->waitForFinished();
-    this->setDisabled(false);
-    return QString(process_output_list.join("\n"));
+    if (async)
+    {
+        busy = true;
+        return QString();
+    }
+    else
+    {
+        qDebug() << program;
+        process->waitForFinished(9999999);
+        this->setDisabled(false);
+        return QString(process_output_list.join("\n"));
+    }
+}
+
+void MainWindow::process_finished(int exitCode, QProcess::ExitStatus ExitStatus)
+{
+    busy = false;
+    qDebug() << "done";
 }
 
 bool MainWindow::run_q2rad()
 {
+    QDir python_folder(QString::fromStdString(PYTHON_FOLDER));
+    QDir q2rad_folder(QString::fromStdString(PYTHON_FOLDER) + "/Lib/site-packages/q2rad");
+    qint64 *pid;
+    if (python_folder.exists() and q2rad_folder.exists())
+    {
+        // process->setWorkingDirectory(QApplication::applicationDirPath() + "/q2rad");
+        process->startDetached(QApplication::applicationDirPath() + "/" + QString().fromStdString(PYTHON_FOLDER) + "/python.exe", {"-m", "q2rad"}, QApplication::applicationDirPath() + "/q2rad", pid);
+        exit(0);
+        qDebug() << process->state() << busy;
+        // busy = true;
+        // while (busy)
+        // {
+        // }
+        qDebug() << process->state() << busy;
+        // if (process->processId() != 0)
+        //     exit(0);
+    }
+    process->setWorkingDirectory(QApplication::applicationDirPath());
     return false;
 }
 
-void MainWindow::on_toolButton_Ok_clicked()
+bool MainWindow::download_python_zip()
 {
-
-    if (ui->radioButton_local->isChecked())
+    QDir folder(QString::fromStdString(PYTHON_FOLDER));
+    if (!folder.exists())
     {
-        install_local_python();
+        if (!folder.mkpath("."))
+        {
+            mylog("Cannot create folder: " + PYTHON_FOLDER, color_err);
+            return false;
+        }
+        else
+        {
+        }
     }
     else
     {
-        install_on_system_python();
+        mylog("Local Python is ready!", color_task);
+        return true;
     }
-}
-
-void MainWindow::download_python_zip()
-{
     QByteArray python_zip_file;
     string font_color_green = "<font color=green>";
     mylog("Downloading Python", font_size2 + color_task);
@@ -131,7 +173,7 @@ void MainWindow::download_python_zip()
     buffer.open(QIODevice::ReadOnly);
 
     mylog("Downloading complete", font_size2);
-    mylog("Start extracting", font_size2);
+    mylog("Start extracting", font_size2 + color_task);
     mylog("");
     QuaZip zip(&buffer);
     zip.open(QuaZip::mdUnzip);
@@ -162,37 +204,53 @@ void MainWindow::download_python_zip()
         out << "# Uncomment to run site.main() automatically\n";
         out << "import site\n";
     }
+    else
+    {
+        mylog("Error occured while trying to create file : <b>" + PYTHON_FOLDER + "/python311._pth" + "</b>", color_err);
+        return false;
+    }
     python_pth.close();
 
-    mylog("Extracting complete", font_size2);
+    mylog("Local Python successfully installed!", font_size2);
     buffer.close();
     zip.close();
+    return true;
 }
 
-int MainWindow::install_local_python()
+bool MainWindow::install_pip()
 {
-    QDir folder(QString::fromStdString(PYTHON_FOLDER));
-    if (!folder.exists())
-    {
-        if (folder.mkpath("."))
-        {
-            download_python_zip();
-        }
-        else
-        {
-            q2mess("Cannot create folder: " + PYTHON_FOLDER);
-            return 0;
-        }
-    }
-
-    mylog("Checking if pip is there", color_task);
+    mylog("Checking if pip is there:", color_task);
     process->setWorkingDirectory(QApplication::applicationDirPath() + "/" + QString().fromStdString(PYTHON_FOLDER));
-    process_start(this->process->workingDirectory() + "/python.exe", {"-m", "pip", "-V"});
-    mylog("Donloading & Installing pip", color_task);
-    urlretrieve("https://bootstrap.pypa.io/get-pip.py", PYTHON_FOLDER + "/get-pip.py");
-    process_start(this->process->workingDirectory() + "/python.exe", {"get-pip.py", "--no-warn-script-location"});
+    QString ret = process_start(this->process->workingDirectory() + "/python.exe", {"-m", "pip", "-V"}, false);
+    if (ret.length() == 0)
+    {
+        mylog("Donloading & Installing pip", color_task);
+        urlretrieve("https://bootstrap.pypa.io/get-pip.py", PYTHON_FOLDER + "/get-pip.py");
+        process_start(this->process->workingDirectory() + "/python.exe", {"get-pip.py", "--no-warn-script-location"}, false);
+        mylog("pip is installed!", color_task);
+    }
+    else
+        mylog("Pip is ready!", color_task);
+    return true;
+}
 
-    return 0;
+bool MainWindow::install_local_python()
+{
+    if (!download_python_zip())
+        return 0;
+    if (!install_pip())
+        return 0;
+    if (!install_local_q2rad())
+        return 0;
+}
+
+bool MainWindow::install_local_q2rad()
+{
+    process->setWorkingDirectory(QApplication::applicationDirPath());
+    QString ret = process_start(this->process->workingDirectory() + "/" + QString().fromStdString(PYTHON_FOLDER) + "/python.exe", {"-m", "pip", "install", "--no-warn-script-location", "q2rad"}, false);
+    mylog("q2rad is installed!", color_task);
+    run_q2rad();
+    return true;
 }
 
 int MainWindow::install_on_system_python()
@@ -203,12 +261,28 @@ int MainWindow::install_on_system_python()
 void MainWindow::on_toolButton_Cancel_clicked()
 {
     // std::cout << q2mess("Close");
+    if (busy)
+        return;
     close();
+}
+
+void MainWindow::on_toolButton_Ok_clicked()
+{
+    if (busy)
+        return;
+    if (ui->radioButton_local->isChecked())
+    {
+        install_local_python();
+    }
+    else
+    {
+        install_on_system_python();
+    }
 }
 
 bool MainWindow::is_python()
 {
-    mylog("Checking if syste python there", color_task);
+    mylog("Checking if system python there", color_task);
     QString ret = process_start("python", QStringList() << "-V", false);
     if (ret.length() == 0)
     {
