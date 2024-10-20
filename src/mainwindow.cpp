@@ -2,7 +2,6 @@
 #include "ui_mainwindow.h"
 #include <QMessageBox>
 #include <windows.h>
-#include <iostream>
 #include <string>
 #include "q2dialog.h"
 #include <QProcess>
@@ -16,10 +15,11 @@
 #include <QThread>
 #include <quazip/quazipfile.h>
 #include <quazip/quazip.h>
-#include <future>
-#include <thread>
-#include <chrono>
-
+#include <QtConcurrent>
+#include <QFuture>
+#include <QPromise>
+#include <QCloseEvent>
+#include <QSysInfo>
 // #include "fmt/core.h"
 
 using namespace std;
@@ -27,6 +27,12 @@ using namespace std;
 const string PYTHON_VERSION = "3.11.7";
 const string PYTHON_FOLDER = "q2rad/python.loc." + PYTHON_VERSION;
 const string PYTHON_SOURCE = "https://www.python.org/ftp/python/" + PYTHON_VERSION + "/python-" + PYTHON_VERSION + "-embed-amd64.zip";
+
+#if defined(Q_OS_WIN)
+const string SCRIPT_FOLDER = "Scripts";
+#else
+const string SCRIPT_FOLDER = "bin";
+#endif
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
                                           ui(new Ui::MainWindow)
@@ -36,8 +42,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     connect(process, &QProcess::readyReadStandardOutput, this, &MainWindow::process_output);
     connect(process, &QProcess::finished, this, &MainWindow::process_finished);
 
-    // install_local_python();
-    // exit(0);
     if (run_q2rad())
     {
         close();
@@ -48,12 +52,25 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     {
         ui->radioButton_system->setDisabled(true);
     }
-    ui->progressBar->hide();
+    // ui->progressBar->hide();
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    if (busy)
+    {
+        if (q2mess("Installation is in progress! Should I stop??", {"No", "Yes"}) == 2)
+            exit(0);
+        else
+            event->ignore();
+    }
+    else
+        exit(0);
 }
 
 void MainWindow::mylog(string s)
@@ -81,44 +98,43 @@ void MainWindow::process_output()
     QByteArray output = process->readAllStandardOutput();
     QString outputString = QString::fromLocal8Bit(output);
     QStringList lines = outputString.split("\n", Qt::SkipEmptyParts);
-    // qDebug() << lines;
     QApplication::processEvents();
     process_output_list.append(lines);
     foreach (const QString &line, lines)
     {
-        mylog(QString(line).replace("\r", "").toStdString());
+        mylog(QString(line).replace("\r", "").toStdString(), color_out);
     }
 }
 
-QString MainWindow::process_start(QString program, QStringList arguments, bool async = true)
+QString MainWindow::process_start(QString program, QStringList arguments, bool async = false)
 {
     process_output_list.clear();
-    process->kill();
-    process->start(program, arguments);
     QString command = program;
     command.append(" ");
     command.append(arguments.join((" ")));
-    // process_output_list.append(program);
     mylog(command.toStdString(), color_cmd);
-    QApplication::processEvents();
-    if (async)
+    process->kill();
+    process->start(program, arguments);
+    busy = true;
+    ui->frame_top->setDisabled(true);
+    if (!process->waitForStarted())
     {
-        busy = true;
-        return QString();
+        busy = false;
+        ui->frame_top->setDisabled(false);
+        return QString("");
     }
-    else
+    while (busy)
     {
-        qDebug() << program;
-        process->waitForFinished(9999999);
-        this->setDisabled(false);
-        return QString(process_output_list.join("\n"));
+        QThread::msleep(50);
+        QApplication::processEvents();
     }
+    ui->frame_top->setDisabled(false);
+    return QString(process_output_list.join("\n"));
 }
 
 void MainWindow::process_finished(int exitCode, QProcess::ExitStatus ExitStatus)
 {
     busy = false;
-    qDebug() << "done";
 }
 
 bool MainWindow::run_q2rad()
@@ -126,21 +142,39 @@ bool MainWindow::run_q2rad()
     QDir python_folder(QString::fromStdString(PYTHON_FOLDER));
     QDir q2rad_folder(QString::fromStdString(PYTHON_FOLDER) + "/Lib/site-packages/q2rad");
     qint64 *pid;
+    QString python_bin = "";
+    // QString q2rad_install_folder = "";
+    QString q2rad_install_folder = QString("/q2rad");
+    QStringList python_test_args = {"-c", "import q2rad;print(q2rad.version.__version__)"};
+    QStringList q2rad_run_args = {"-c", "from q2rad.q2rad import main;main()"};
+
     if (python_folder.exists() and q2rad_folder.exists())
     {
-        // process->setWorkingDirectory(QApplication::applicationDirPath() + "/q2rad");
-        process->startDetached(QApplication::applicationDirPath() + "/" + QString().fromStdString(PYTHON_FOLDER) + "/python.exe", {"-m", "q2rad"}, QApplication::applicationDirPath() + "/q2rad", pid);
-        exit(0);
-        qDebug() << process->state() << busy;
-        // busy = true;
-        // while (busy)
-        // {
-        // }
-        qDebug() << process->state() << busy;
-        // if (process->processId() != 0)
-        //     exit(0);
+        python_bin = QApplication::applicationDirPath() +
+                     "/" + QString().fromStdString(PYTHON_FOLDER) +
+                     "/python";
     }
-    process->setWorkingDirectory(QApplication::applicationDirPath());
+    else if (QDir("q2rad/q2rad").exists())
+    {
+        python_bin = QApplication::applicationDirPath() +
+                     QString().fromStdString("/q2rad/q2rad/" + SCRIPT_FOLDER + "/python");
+    }
+
+    if (python_bin.length() != 0)
+    {
+        QProcess tmp_process;
+        tmp_process.start(python_bin, python_test_args);
+        tmp_process.waitForFinished();
+        QString ret = QString(tmp_process.readAllStandardOutput());
+        if (ret.length() > 0)
+        {
+            tmp_process.startDetached(python_bin, {"-m", "q2rad"}, QApplication::applicationDirPath() + q2rad_install_folder);
+            QThread::msleep(3000);
+            process->waitForStarted();
+            exit(0);
+        }
+    }
+
     return false;
 }
 
@@ -160,9 +194,15 @@ bool MainWindow::download_python_zip()
     }
     else
     {
-        mylog("Local Python is ready!", color_task);
-        return true;
+        QString ret = process_start(qApp->applicationDirPath() + "/" + QString().fromStdString(PYTHON_FOLDER) + "/python", {"-V"}, false);
+        if (ret.length() > 0)
+        {
+            mylog("Local Python is ready!", color_task);
+            return true;
+        }
     }
+    // no local python - download
+    busy = true;
     QByteArray python_zip_file;
     string font_color_green = "<font color=green>";
     mylog("Downloading Python", font_size2 + color_task);
@@ -214,6 +254,7 @@ bool MainWindow::download_python_zip()
     mylog("Local Python successfully installed!", font_size2);
     buffer.close();
     zip.close();
+    busy = false;
     return true;
 }
 
@@ -221,12 +262,12 @@ bool MainWindow::install_pip()
 {
     mylog("Checking if pip is there:", color_task);
     process->setWorkingDirectory(QApplication::applicationDirPath() + "/" + QString().fromStdString(PYTHON_FOLDER));
-    QString ret = process_start(this->process->workingDirectory() + "/python.exe", {"-m", "pip", "-V"}, false);
+    QString ret = process_start(this->process->workingDirectory() + "/python", {"-m", "pip", "-V"}, false);
     if (ret.length() == 0)
     {
         mylog("Donloading & Installing pip", color_task);
         urlretrieve("https://bootstrap.pypa.io/get-pip.py", PYTHON_FOLDER + "/get-pip.py");
-        process_start(this->process->workingDirectory() + "/python.exe", {"get-pip.py", "--no-warn-script-location"}, false);
+        process_start(this->process->workingDirectory() + "/python", {"get-pip.py", "--no-warn-script-location"}, false);
         mylog("pip is installed!", color_task);
     }
     else
@@ -234,33 +275,45 @@ bool MainWindow::install_pip()
     return true;
 }
 
+bool MainWindow::install_global_python()
+{
+    mylog("Donloading & Installing q2rad", color_task);
+    if (!QDir("q2rad").exists())
+    {
+        QDir("q2rad").mkpath(".");
+    }
+    urlretrieve("https://raw.githubusercontent.com/AndreiPuchko/q2rad/main/install/get-q2rad.py", "./q2rad/get-q2rad.py");
+    process->setWorkingDirectory(QApplication::applicationDirPath());
+    QString ret = process_start("python", {"./q2rad/get-q2rad.py", "--no-warn-script-location"}, false);
+    mylog("q2rad is installed!", color_task);
+    QFile("./q2rad/get-q2rad.py").remove();
+    QFile("./start-q2rad.bat").remove();
+    exit(0);
+    return true;
+}
+
 bool MainWindow::install_local_python()
 {
     if (!download_python_zip())
-        return 0;
+        return true;
     if (!install_pip())
-        return 0;
+        return true;
     if (!install_local_q2rad())
-        return 0;
+        return true;
+    return false;
 }
 
 bool MainWindow::install_local_q2rad()
 {
     process->setWorkingDirectory(QApplication::applicationDirPath());
-    QString ret = process_start(this->process->workingDirectory() + "/" + QString().fromStdString(PYTHON_FOLDER) + "/python.exe", {"-m", "pip", "install", "--no-warn-script-location", "q2rad"}, false);
+    QString ret = process_start(this->process->workingDirectory() + "/" + QString().fromStdString(PYTHON_FOLDER) + "/python", {"-m", "pip", "install", "--no-warn-script-location", "q2rad"}, false);
     mylog("q2rad is installed!", color_task);
     run_q2rad();
     return true;
 }
 
-int MainWindow::install_on_system_python()
-{
-    return 0;
-}
-
 void MainWindow::on_toolButton_Cancel_clicked()
 {
-    // std::cout << q2mess("Close");
     if (busy)
         return;
     close();
@@ -270,26 +323,30 @@ void MainWindow::on_toolButton_Ok_clicked()
 {
     if (busy)
         return;
+    ui->progressBar->setMaximum(0);
     if (ui->radioButton_local->isChecked())
     {
         install_local_python();
     }
     else
     {
-        install_on_system_python();
+        install_global_python();
     }
+    ui->progressBar->setMaximum(100);
 }
 
 bool MainWindow::is_python()
 {
-    mylog("Checking if system python there", color_task);
-    QString ret = process_start("python", QStringList() << "-V", false);
+    mylog("Checking if system Python is there:", color_task);
+    QString ret = process_start("python", {"-V"}, false);
     if (ret.length() == 0)
     {
+        mylog("System Python not found", font_size2);
         return false;
     }
     else
     {
+        mylog("System Python is available", font_size2);
         return true;
     }
 }

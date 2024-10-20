@@ -31,6 +31,7 @@ private slots:
     void mylog(std::string s, std::string format);
     bool is_python();
     void process_finished(int exitCode, QProcess::ExitStatus ExitStatus);
+    void closeEvent (QCloseEvent *event);
 
 private:
     QProcess *process;
@@ -40,10 +41,9 @@ private:
     bool run_q2rad();
     
     bool install_local_python();
+    bool install_global_python();
     bool install_pip();
     bool install_local_q2rad();
-
-    int install_on_system_python();
     bool download_python_zip();
 
     void process_output();
