@@ -15,7 +15,6 @@
 #include <QThread>
 #include <quazip/quazipfile.h>
 #include <quazip/quazip.h>
-#include <QtConcurrent>
 #include <QFuture>
 #include <QPromise>
 #include <QCloseEvent>
@@ -94,7 +93,6 @@ void MainWindow::showSplash()
              << QPoint(px + squareSize / 2, py + squareSize / 2)
              << QPoint(px, py + squareSize)
              << QPoint(px - squareSize / 2, py + squareSize / 2);
-    // painter.setBrush(Qt::GlobalColor::darkMagenta);
     painter.drawPolygon(diamond1);
 
     px = squareSize + squareSize / 2 + squareSize * 0.1;
@@ -113,7 +111,6 @@ void MainWindow::showSplash()
              << QPoint(px + squareSize / 2, py + squareSize / 2)
              << QPoint(px, py + squareSize)
              << QPoint(px - squareSize / 2, py + squareSize / 2);
-    // painter.setBrush(Qt::red);
     painter.drawPolygon(diamond3);
 
     painter.end();
@@ -235,7 +232,6 @@ bool MainWindow::run_q2rad()
                 logfile_size = logfile.size();
             else
                 logfile_size = 0;
-            qDebug() << logfile_size;
             tmp_process.startDetached(python_bin, {"-m", "q2rad"}, QApplication::applicationDirPath() + q2rad_install_folder);
             process->waitForStarted();
             do

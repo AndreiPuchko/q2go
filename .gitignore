@@ -4,5 +4,8 @@ build/*
 deps
 quazip/*
 release/*
+3party/*
 !/release/._deploy.bat
+!3party/*.bat
+!3party/*.sh
 CMakeLists.txt.user
