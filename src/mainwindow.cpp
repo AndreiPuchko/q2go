@@ -167,7 +167,7 @@ void MainWindow::process_output()
     }
 }
 
-QString MainWindow::process_start(QString program, QStringList arguments, bool async = false)
+QString MainWindow::process_start(QString program, QStringList arguments)
 {
     process_output_list.clear();
     QString command = program;
@@ -240,9 +240,10 @@ bool MainWindow::run_q2rad()
             process->waitForStarted();
             do
             {
-                logfile.refresh();
                 QThread::msleep(100);
+                logfile.refresh();
             } while (logfile.size() == logfile_size);
+            QThread::msleep(1000);
             exit(0);
         }
     }
@@ -266,7 +267,7 @@ bool MainWindow::download_python_zip()
     }
     else
     {
-        QString ret = process_start(qApp->applicationDirPath() + "/" + QString().fromStdString(PYTHON_FOLDER) + "/python", {"-V"}, false);
+        QString ret = process_start(qApp->applicationDirPath() + "/" + QString().fromStdString(PYTHON_FOLDER) + "/python", {"-V"});
         if (ret.length() > 0)
         {
             mylog("Local Python is ready!", color_task);
@@ -334,12 +335,12 @@ bool MainWindow::install_pip()
 {
     mylog("Checking if pip is there:", color_task);
     process->setWorkingDirectory(QApplication::applicationDirPath() + "/" + QString().fromStdString(PYTHON_FOLDER));
-    QString ret = process_start(this->process->workingDirectory() + "/python", {"-m", "pip", "-V"}, false);
+    QString ret = process_start(this->process->workingDirectory() + "/python", {"-m", "pip", "-V"});
     if (ret.length() == 0)
     {
         mylog("Donloading & Installing pip", color_task);
         urlretrieve("https://bootstrap.pypa.io/get-pip.py", PYTHON_FOLDER + "/get-pip.py");
-        process_start(this->process->workingDirectory() + "/python", {"get-pip.py", "--no-warn-script-location"}, false);
+        process_start(this->process->workingDirectory() + "/python", {"get-pip.py", "--no-warn-script-location"});
         mylog("pip is installed!", color_task);
     }
     else
@@ -356,7 +357,7 @@ bool MainWindow::install_global_python()
     }
     urlretrieve("https://raw.githubusercontent.com/AndreiPuchko/q2rad/main/install/get-q2rad.py", "./q2rad/get-q2rad.py");
     process->setWorkingDirectory(QApplication::applicationDirPath());
-    QString ret = process_start("python", {"./q2rad/get-q2rad.py", "--no-warn-script-location"}, false);
+    QString ret = process_start("python", {"./q2rad/get-q2rad.py", "--no-warn-script-location"});
     mylog("q2rad is installed!", color_task);
     QThread::msleep(5000);
     splash->show();
@@ -380,7 +381,7 @@ bool MainWindow::install_local_python()
 bool MainWindow::install_local_q2rad()
 {
     process->setWorkingDirectory(QApplication::applicationDirPath());
-    QString ret = process_start(this->process->workingDirectory() + "/" + QString().fromStdString(PYTHON_FOLDER) + "/python", {"-m", "pip", "install", "--no-warn-script-location", "q2rad"}, false);
+    QString ret = process_start(this->process->workingDirectory() + "/" + QString().fromStdString(PYTHON_FOLDER) + "/python", {"-m", "pip", "install", "--no-warn-script-location", "q2rad"});
     mylog("q2rad is installed!", color_task);
     run_q2rad();
     return true;
@@ -412,7 +413,7 @@ void MainWindow::on_toolButton_Ok_clicked()
 bool MainWindow::is_python()
 {
     mylog("Checking if system Python is there:", color_task);
-    QString ret = process_start("python", {"-V"}, false);
+    QString ret = process_start("python", {"-V"});
     if (ret.length() == 0)
     {
         mylog("System Python not found", font_size2);

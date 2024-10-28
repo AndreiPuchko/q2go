@@ -28,12 +28,8 @@ public:
 private slots:
     void on_toolButton_Ok_clicked();
     void on_toolButton_Cancel_clicked();
-    void mylog(std::string s);
-    void mylog(std::string s, std::string format);
-    bool is_python();
     void process_finished(int exitCode, QProcess::ExitStatus ExitStatus);
-    void closeEvent (QCloseEvent *event);
-    void showSplash();
+    void process_output();
 private:
     QProcess *process;
     QStringList process_output_list;
@@ -42,14 +38,18 @@ private:
     QSplashScreen *splash;
     bool run_q2rad();
     
+    void mylog(std::string s);
+    void mylog(std::string s, std::string format);
+    bool is_python();
+    void closeEvent (QCloseEvent *event);
+    void showSplash();
     bool install_local_python();
     bool install_global_python();
     bool install_pip();
     bool install_local_q2rad();
     bool download_python_zip();
-    
-    void process_output();
-    QString process_start(QString program, QStringList arguments, bool async);
+
+    QString process_start(QString program, QStringList arguments);
 };
 
 #endif // MAINWINDOW_H
