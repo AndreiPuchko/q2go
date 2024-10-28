@@ -20,13 +20,17 @@
 #include <QPromise>
 #include <QCloseEvent>
 #include <QSysInfo>
+#include <QPainter>
 // #include "fmt/core.h"
 
 using namespace std;
 
 const string PYTHON_VERSION = "3.11.7";
 const string PYTHON_FOLDER = "q2rad/python.loc." + PYTHON_VERSION;
-const string PYTHON_SOURCE = "https://www.python.org/ftp/python/" + PYTHON_VERSION + "/python-" + PYTHON_VERSION + "-embed-amd64.zip";
+const string PYTHON_SOURCE =
+    "https://www.python.org/ftp/python/" +
+    PYTHON_VERSION + "/python-" +
+    PYTHON_VERSION + "-embed-amd64.zip";
 
 #if defined(Q_OS_WIN)
 const string SCRIPT_FOLDER = "Scripts";
@@ -42,22 +46,79 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     connect(process, &QProcess::readyReadStandardOutput, this, &MainWindow::process_output);
     connect(process, &QProcess::finished, this, &MainWindow::process_finished);
 
-    if (run_q2rad())
+    showSplash();
+    splash->show();
+    qApp->processEvents();
+    if (!run_q2rad())
     {
-        close();
-        exit(0);
+        splash->hide();
+        ui->setupUi(this);
+        if (!is_python())
+        {
+            ui->radioButton_system->setDisabled(true);
+        }
+        // close();
+        // exit(0);
     }
-    ui->setupUi(this);
-    if (!is_python())
-    {
-        ui->radioButton_system->setDisabled(true);
-    }
-    // ui->progressBar->hide();
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+
+void MainWindow::showSplash()
+{
+    QPixmap pixmap(QGuiApplication::primaryScreen()->size().width() / 4, QGuiApplication::primaryScreen()->size().height() / 4);
+    pixmap.fill(QColor("white"));
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    // Рисуем черную рамку вокруг прямоугольника
+    painter.setPen(Qt::black);
+    painter.drawRect(0, 0, pixmap.width() - 1, pixmap.height() - 1);
+
+    int rectWidth = pixmap.width();
+    int rectHeight = pixmap.height();
+
+    int squareSize = rectWidth / 7;
+    int centerX = rectWidth / 2;
+    int centerY = rectHeight / 2;
+    // Первый квадрат (верхний)
+    int px = squareSize;
+    int py = centerY - squareSize;
+    painter.setBrush(Qt::black);
+
+    QPolygon diamond1;
+    diamond1 << QPoint(px, py)
+             << QPoint(px + squareSize / 2, py + squareSize / 2)
+             << QPoint(px, py + squareSize)
+             << QPoint(px - squareSize / 2, py + squareSize / 2);
+    // painter.setBrush(Qt::GlobalColor::darkMagenta);
+    painter.drawPolygon(diamond1);
+
+    px = squareSize + squareSize / 2 + squareSize * 0.1;
+    py = centerY - squareSize / 2;
+    QPolygon diamond2;
+    diamond2 << QPoint(px, py)
+             << QPoint(px + squareSize / 2, py + squareSize / 2)
+             << QPoint(px, py + squareSize)
+             << QPoint(px - squareSize / 2, py + squareSize / 2);
+    painter.drawPolygon(diamond2);
+
+    px = squareSize;
+    py = centerY - squareSize + squareSize;
+    QPolygon diamond3;
+    diamond3 << QPoint(px, py)
+             << QPoint(px + squareSize / 2, py + squareSize / 2)
+             << QPoint(px, py + squareSize)
+             << QPoint(px - squareSize / 2, py + squareSize / 2);
+    // painter.setBrush(Qt::red);
+    painter.drawPolygon(diamond3);
+
+    painter.end();
+
+    splash = new QSplashScreen(pixmap);
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -168,9 +229,20 @@ bool MainWindow::run_q2rad()
         QString ret = QString(tmp_process.readAllStandardOutput());
         if (ret.length() > 0)
         {
+            qint64 logfile_size;
+            QFileInfo logfile = QFileInfo("q2rad/log/q2.log");
+            if (logfile.isFile())
+                logfile_size = logfile.size();
+            else
+                logfile_size = 0;
+            qDebug() << logfile_size;
             tmp_process.startDetached(python_bin, {"-m", "q2rad"}, QApplication::applicationDirPath() + q2rad_install_folder);
-            QThread::msleep(3000);
             process->waitForStarted();
+            do
+            {
+                logfile.refresh();
+                QThread::msleep(100);
+            } while (logfile.size() == logfile_size);
             exit(0);
         }
     }
@@ -286,6 +358,8 @@ bool MainWindow::install_global_python()
     process->setWorkingDirectory(QApplication::applicationDirPath());
     QString ret = process_start("python", {"./q2rad/get-q2rad.py", "--no-warn-script-location"}, false);
     mylog("q2rad is installed!", color_task);
+    QThread::msleep(5000);
+    splash->show();
     QFile("./q2rad/get-q2rad.py").remove();
     QFile("./start-q2rad.bat").remove();
     exit(0);

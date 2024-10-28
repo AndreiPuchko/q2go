@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <QProcess>
+#include <QSplashScreen>
 
 namespace Ui
 {
@@ -32,12 +33,13 @@ private slots:
     bool is_python();
     void process_finished(int exitCode, QProcess::ExitStatus ExitStatus);
     void closeEvent (QCloseEvent *event);
-
+    void showSplash();
 private:
     QProcess *process;
     QStringList process_output_list;
     Ui::MainWindow *ui;
     bool busy;
+    QSplashScreen *splash;
     bool run_q2rad();
     
     bool install_local_python();
@@ -45,7 +47,7 @@ private:
     bool install_pip();
     bool install_local_q2rad();
     bool download_python_zip();
-
+    
     void process_output();
     QString process_start(QString program, QStringList arguments, bool async);
 };
