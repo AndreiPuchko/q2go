@@ -47,9 +47,11 @@ private:
     bool install_global_python();
     bool install_pip();
     bool install_local_q2rad();
-    bool download_python_zip();
+    bool download_windows_binary_python();
+    bool download_sources_python();
 
     QString process_start(QString program, QStringList arguments);
+    QString process_start_str(std::string program, std::vector<std::string> arguments);
 };
 
 #endif // MAINWINDOW_H

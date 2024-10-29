@@ -26,14 +26,7 @@ QByteArray urlretrieve(string url)
 
 bool urlretrieve(string url, string file_name)
 {
-    // QUrl qurl = QUrl(QString::fromStdString(url));
-    // QNetworkAccessManager manager;
-    // QNetworkReply *response = manager.get(QNetworkRequest(qurl));
-    // QEventLoop event;
-    // QObject::connect(response, SIGNAL(finished()), &event, SLOT(quit()));
-    // event.exec();
     QByteArray content = urlretrieve(url);
-    
     QFile localFile(QString::fromStdString(file_name));
     if (!localFile.open(QIODevice::WriteOnly))
     {
