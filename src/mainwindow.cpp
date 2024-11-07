@@ -477,10 +477,12 @@ bool MainWindow::install_global_python()
 
 bool MainWindow::install_local_python()
 {
+#if !defined(Q_OS_WIN)
     if (q2mess("It can take much more time than using global python! Are you sure?", {"No", "Yes"}) !=2)
     {
         return false;
     }
+#endif
 #if defined(Q_OS_WIN)
     if (!download_windows_binary_python())
         return true;

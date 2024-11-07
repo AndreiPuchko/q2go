@@ -83,8 +83,6 @@ message("*********************************")
 message(${CMAKE_BINARY_DIR})
 message(${CMAKE_INSTALL_PREFIX})
 
-# Информация о проекте
-
 if (WIN32)
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND $ENV{QtDIR}/bin/windeployqt.exe --release $<TARGET_FILE_DIR:q2go>
@@ -118,7 +116,6 @@ if (WIN32)
 endif()
 
 install(TARGETS ${PROJECT_NAME} DESTINATION .)
-# install(DIRECTORY "${CMAKE_BINARY_DIR}/" DESTINATION .)
 install(DIRECTORY "${CMAKE_BINARY_DIR}/" DESTINATION .
     FILES_MATCHING 
         PATTERN "*.dll" 
@@ -132,16 +129,17 @@ install(DIRECTORY "${CMAKE_BINARY_DIR}/" DESTINATION .
         PATTERN "q2go_autogen" EXCLUDE
     )
 
-# Определите типы установщиков для каждой ОС
+# 
 if(WIN32)
-    set(CPACK_GENERATOR "NSIS")  # или "WIX" для MSI
+    set(CPACK_GENERATOR "ZIP;NSIS")
 elseif(APPLE)
-    set(CPACK_GENERATOR "DragNDrop")  # или "productbuild" для pkg
+    set(CPACK_GENERATOR "DragNDrop")
 else()
-    set(CPACK_GENERATOR "DEB;TGZ")  # для Linux
+    set(CPACK_GENERATOR "DEB;TGZ")
 endif()
 
 
+# Project info
 set(CPACK_PACKAGE_NAME "q2go")
 set(CPACK_PACKAGE_VENDOR "YourCompanyName")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The installer/launcher fot the q2rad project")
@@ -161,11 +159,4 @@ set(CPACK_NSIS_CREATE_ICONS_EXTRA
 set (CPACK_PACKAGE_INSTALL_DIRECTORY)
 
 
-# # Настройки для конкретных типов пакетов (например, DEB)
-# if(CPACK_GENERATOR STREQUAL "DEB")
-#     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Your Maintainer Name")  # Обязательно для DEB
-#     set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.7)")
-# endif()
-
-# # Включение CPack
 include(CPack)
